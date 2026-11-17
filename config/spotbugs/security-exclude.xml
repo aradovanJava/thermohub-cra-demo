@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Documented risk acceptance. Every suppression needs a justification, an owner and a review date.
+  These entries are part of the technical documentation (CRA Annex VII, point 2(b) and the risk assessment of Art. 13(2)).
+  The LEGACY module deliberately has NO suppressions.
+-->
+<FindBugsFilter
+        xmlns="https://github.com/spotbugs/filter/3.0.0"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="https://github.com/spotbugs/filter/3.0.0 https://raw.githubusercontent.com/spotbugs/spotbugs/3.1.0/spotbugs/etc/findbugsfilter.xsd">
+
+    <!-- Inventory finding, not a vulnerability: "this class is a Spring endpoint". -->
+    <Match>
+        <Bug pattern="SPRING_ENDPOINT"/>
+    </Match>
+
+    <!-- RISK-001 (owner: platform team, review: 2027-06-30)
+         The ThermoHub API is consumed by thermostats and the CLI, never by browsers; it is stateless
+         (no session cookie). CSRF requires ambient browser credentials, so the control does not apply. -->
+    <Match>
+        <Class name="demo.thermohub.cra.config.SecurityConfig"/>
+        <Bug pattern="SPRING_CSRF_PROTECTION_DISABLED"/>
+    </Match>
+
+    <!-- RISK-002 (owner: platform team, review: 2027-06-30)
+         The CRA product logs exclusively as ECS JSON (logging.structured.format.console=ecs). The JSON
+         encoder escapes CR/LF in every field, so a forged line break cannot create a new log entry.
+         Request values are allowlist-validated before they reach a log statement. -->
+    <Match>
+        <Package name="~demo\.thermohub\.cra(\..*)?"/>
+        <Bug pattern="CRLF_INJECTION_LOGS"/>
+    </Match>
+</FindBugsFilter>

@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ThermoHub – "Breaking the Build" demo for Cyber Security Day 2026
+  Retrofitting OWASP Top 10:2025 for EU Cyber Resilience Act (Regulation (EU) 2024/2847) compliance.
+
+  Modules
+    cra-conformance-suite  executable CRA/OWASP requirements (JUnit) shared by both apps
+    thermohub-legacy       the product as it was shipped – intentionally vulnerable (DO NOT DEPLOY)
+    thermohub-cra          the retrofitted, CRA-ready product
+
+  Quality gates (Maven profiles – tick them in IntelliJ's Maven tool window)
+    cra-sast   SpotBugs + FindSecBugs, security detectors only, breaks the build      (Annex I Part II (3))
+    cra-sbom   CycloneDX SBOM in target/bom.json + bom.xml                            (Annex I Part II (1))
+    cra-gate   everything above + the conformance suite for the legacy module
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- CRA tip: your support period (Art. 13(8), at least 5 years in most cases) must be covered by the
+         support windows of your frameworks. Spring Boot 3.5 lost OSS support on 30 June 2026. -->
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>4.1.2</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>demo.thermohub</groupId>
+    <artifactId>thermohub-parent</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+    <name>ThermoHub – CRA retrofit demo</name>
+
+    <modules>
+        <module>cra-conformance-suite</module>
+        <module>thermohub-legacy</module>
+        <module>thermohub-cra</module>
+    </modules>
+
+    <properties>
+        <java.version>21</java.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
+        <spotbugs-maven-plugin.version>4.9.8.4</spotbugs-maven-plugin.version>
+        <findsecbugs.version>1.14.0</findsecbugs.version>
+        <cyclonedx-maven-plugin.version>2.9.1</cyclonedx-maven-plugin.version>
+
+        <!-- Repository root (anchored by the .mvn directory), used to locate shared gate configuration -->
+        <cra.config.dir>${maven.multiModuleProjectDirectory}/config</cra.config.dir>
+    </properties>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <!-- SAST: SpotBugs with the Find Security Bugs plugin. Only the SECURITY category is reported,
+                     so the gate is about vulnerabilities, not style. -->
+                <plugin>
+                    <groupId>com.github.spotbugs</groupId>
+                    <artifactId>spotbugs-maven-plugin</artifactId>
+                    <version>${spotbugs-maven-plugin.version}</version>
+                    <configuration>
+                        <effort>Max</effort>
+                        <threshold>Medium</threshold>
+                        <failOnError>true</failOnError>
+                        <includeFilterFile>${cra.config.dir}/spotbugs/security-include.xml</includeFilterFile>
+                        <excludeFilterFile>${cra.config.dir}/spotbugs/security-exclude.xml</excludeFilterFile>
+                        <xmlOutput>true</xmlOutput>
+                        <sarifOutput>true</sarifOutput>
+                        <plugins>
+                            <plugin>
+                                <groupId>com.h3xstream.findsecbugs</groupId>
+                                <artifactId>findsecbugs-plugin</artifactId>
+                                <version>${findsecbugs.version}</version>
+                            </plugin>
+                        </plugins>
+                    </configuration>
+                    <executions>
+                        <execution>
+                            <id>cra-sast</id>
+                            <phase>verify</phase>
+                            <goals>
+                                <goal>check</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                </plugin>
+
+                <!-- SBOM: CycloneDX (OWASP flagship project, ECMA-424). Machine-readable, all dependencies. -->
+                <plugin>
+                    <groupId>org.cyclonedx</groupId>
+                    <artifactId>cyclonedx-maven-plugin</artifactId>
+                    <version>${cyclonedx-maven-plugin.version}</version>
+                    <configuration>
+                        <projectType>application</projectType>
+                        <outputFormat>all</outputFormat>
+                        <outputName>bom</outputName>
+                    </configuration>
+                    <executions>
+                        <execution>
+                            <id>cra-sbom</id>
+                            <phase>package</phase>
+                            <goals>
+                                <goal>makeBom</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+
+    <profiles>
+        <profile>
+            <id>cra-sast</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>com.github.spotbugs</groupId>
+                        <artifactId>spotbugs-maven-plugin</artifactId>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
+            <id>cra-sbom</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.cyclonedx</groupId>
+                        <artifactId>cyclonedx-maven-plugin</artifactId>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
+            <id>cra-gate</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.cyclonedx</groupId>
+                        <artifactId>cyclonedx-maven-plugin</artifactId>
+                    </plugin>
+                    <plugin>
+                        <groupId>com.github.spotbugs</groupId>
+                        <artifactId>spotbugs-maven-plugin</artifactId>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+</project>

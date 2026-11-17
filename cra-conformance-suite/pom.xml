@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>demo.thermohub</groupId>
+        <artifactId>thermohub-parent</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>cra-conformance-suite</artifactId>
+    <name>CRA conformance suite (executable requirements)</name>
+    <description>
+        OWASP Top 10:2025 attacks expressed as JUnit tests and traced to CRA Annex I requirements.
+        Each product module extends CraConformanceSuite; a red test is a regulatory finding.
+    </description>
+
+    <properties>
+        <!-- Test code lives in src/main here, so the product gates do not apply to this module. -->
+        <spotbugs.skip>true</spotbugs.skip>
+        <cyclonedx.skip>true</cyclonedx.skip>
+    </properties>
+
+    <dependencies>
+        <!-- Supplied by the product under test -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webmvc</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-jdbc</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- Test tooling – compile scope here, test scope for the products -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webmvc-test</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-test</artifactId>
+        </dependency>
+    </dependencies>
+</project>

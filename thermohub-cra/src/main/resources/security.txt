@@ -1,0 +1,11 @@
+# ThermoHub vulnerability disclosure – RFC 9116
+# CRA Annex I Part II (5) coordinated vulnerability disclosure policy, (6) contact address
+Contact: mailto:security@thermohub.example
+Contact: https://thermohub.example/security/report
+Expires: 2027-12-31T23:00:00.000Z
+Encryption: https://thermohub.example/.well-known/pgp-key.txt
+Policy: https://thermohub.example/security/disclosure-policy
+Acknowledgments: https://thermohub.example/security/hall-of-fame
+Preferred-Languages: en, hr, de
+Canonical: https://thermohub.example/.well-known/security.txt
+CSAF: https://thermohub.example/.well-known/csaf/provider-metadata.json

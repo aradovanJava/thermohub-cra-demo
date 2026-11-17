@@ -1,0 +1,13 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="4 CRA conformance - CRA (expect GREEN)" type="JUnit" factoryName="JUnit">
+    <module name="thermohub-cra" />
+    <option name="PACKAGE_NAME" value="demo.thermohub.cra" />
+    <option name="MAIN_CLASS_NAME" value="demo.thermohub.cra.ThermoHubCraConformanceTest" />
+    <option name="METHOD_NAME" value="" />
+    <option name="TEST_OBJECT" value="class" />
+    <option name="WORKING_DIRECTORY" value="$MODULE_WORKING_DIR$" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

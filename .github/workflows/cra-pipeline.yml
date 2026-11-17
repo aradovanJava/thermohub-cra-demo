@@ -1,0 +1,173 @@
+# "Breaking the Build" – the CRA gate as a pipeline.
+#
+# Every job runs for both products. The legacy module is EXPECTED to fail (continue-on-error), so the
+# workflow shows the contrast red vs green while the overall run stays usable.
+#
+# CRA mapping
+#   conformance tests ........ Annex I Part I (1),(2)(a)-(l)  executable essential requirements
+#   SAST (FindSecBugs/Semgrep)  Annex I Part II (3)            effective and regular security testing
+#   SBOM (CycloneDX) ......... Annex I Part II (1)            identify and document components
+#   SCA (Trivy on the SBOM) .. Annex I Part I (2)(a)          no known exploitable vulnerabilities
+#   secrets (gitleaks) ....... Annex I Part I (2)(e)          confidentiality
+#   nightly schedule ......... Annex I Part II (2), Art. 14   new CVEs appear after release
+#
+# Hardening tip for your fork: pin every action to a full commit SHA (A08) – Dependabot keeps SHAs current.
+
+name: CRA pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cra-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test-sast:
+    name: Build, conformance, SAST, SBOM – ${{ matrix.module }}
+    runs-on: ubuntu-latest
+    continue-on-error: ${{ matrix.expected == 'red' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - module: thermohub-cra
+            expected: green
+          - module: thermohub-legacy
+            expected: red
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Build + SBOM (CycloneDX)
+        run: mvn -B -pl ${{ matrix.module }} -am package -DskipTests -Pcra-sbom
+
+      - name: Unit tests + CRA conformance suite
+        if: success() || failure()
+        run: mvn -B -pl ${{ matrix.module }} -am test -Pcra-gate
+
+      - name: SAST – SpotBugs + Find Security Bugs (security category only)
+        if: success() || failure()
+        run: mvn -B -pl ${{ matrix.module }} -am verify -DskipTests -Pcra-sast
+
+      - name: Upload CRA evidence (SBOM, SAST, conformance report)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cra-evidence-${{ matrix.module }}
+          path: |
+            ${{ matrix.module }}/target/bom.json
+            ${{ matrix.module }}/target/bom.xml
+            ${{ matrix.module }}/target/spotbugsXml.xml
+            ${{ matrix.module }}/target/spotbugsSarif.json
+            ${{ matrix.module }}/target/cra-conformance-report-*.md
+            ${{ matrix.module }}/target/surefire-reports/
+          if-no-files-found: warn
+
+  sca:
+    name: SCA on the SBOM – ${{ matrix.module }}
+    needs: build-test-sast
+    if: always()
+    runs-on: ubuntu-latest
+    continue-on-error: ${{ matrix.expected == 'red' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - module: thermohub-cra
+            expected: green
+          - module: thermohub-legacy
+            expected: red
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: cra-evidence-${{ matrix.module }}
+          path: evidence
+
+      # Fails on HIGH/CRITICAL findings that have a fix – "known exploitable" and remediable now.
+      # If the CRA module turns red one morning, that is the system working: bump the BOM (Part II (2)).
+      - name: Trivy – scan the SBOM
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: sbom
+          scan-ref: evidence/bom.json
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+          format: table
+
+  secrets:
+    name: Secret scanning – ${{ matrix.module }}
+    runs-on: ubuntu-latest
+    continue-on-error: ${{ matrix.expected == 'red' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - module: thermohub-cra
+            expected: green
+          - module: thermohub-legacy
+            expected: red
+    steps:
+      - uses: actions/checkout@v5
+      - name: gitleaks
+        run: >
+          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.28.0
+          dir /repo/${{ matrix.module }} --config /repo/.gitleaks.toml --redact --no-banner
+
+  semgrep:
+    name: Semgrep CRA rules – ${{ matrix.module }}
+    runs-on: ubuntu-latest
+    continue-on-error: ${{ matrix.expected == 'red' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - module: thermohub-cra
+            expected: green
+          - module: thermohub-legacy
+            expected: red
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install semgrep==1.185.0
+      - name: Organisation rules with CRA traceability (gating)
+        run: semgrep scan --config .semgrep/cra-rules.yml --error --metrics=off ${{ matrix.module }}
+
+  dast:
+    name: DAST baseline (OWASP ZAP) – thermohub-cra
+    needs: build-test-sast
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - run: mvn -B -pl thermohub-cra -am package -DskipTests
+      - name: Start the product (demo profile)
+        run: |
+          java -jar thermohub-cra/target/thermohub-cra-1.0.0-SNAPSHOT.jar --spring.profiles.active=demo > app.log 2>&1 &
+          for i in $(seq 1 60); do curl -fs http://localhost:8081/actuator/health && break; sleep 2; done
+      - name: ZAP baseline (informational)
+        uses: zaproxy/action-baseline@v0.14.0
+        with:
+          target: http://localhost:8081
+          fail_action: false
+          allow_issue_writing: false

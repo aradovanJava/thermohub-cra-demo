@@ -1,0 +1,14 @@
+target/
+out/
+*.iml
+.idea/
+.DS_Store
+
+# Local secrets – never committed
+http/http-client.private.env.json
+*.key
+*.pem
+
+# Artefacts of the live exploit demo
+PWNED-*
+fw-*.bin

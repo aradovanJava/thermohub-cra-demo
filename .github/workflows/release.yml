@@ -1,0 +1,47 @@
+# Release = signed, attested, documented. CRA Annex I Part II (7) secure distribution of updates,
+# Part II (1) SBOM, Annex VII technical documentation. Triggered by a version tag (v2.5.0).
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write        # create the GitHub release
+      id-token: write        # keyless signing (Sigstore) for attestations
+      attestations: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Full CRA gate on the release candidate
+        run: mvn -B -pl thermohub-cra -am verify -Pcra-gate
+
+      - name: Build provenance attestation (SLSA)
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: thermohub-cra/target/thermohub-cra-*.jar
+
+      - name: SBOM attestation
+        uses: actions/attest-sbom@v2
+        with:
+          subject-path: thermohub-cra/target/thermohub-cra-*.jar
+          sbom-path: thermohub-cra/target/bom.json
+
+      - name: Publish release with SBOM and conformance report
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            thermohub-cra/target/thermohub-cra-*.jar
+            thermohub-cra/target/bom.json
+            thermohub-cra/target/cra-conformance-report-*.md
