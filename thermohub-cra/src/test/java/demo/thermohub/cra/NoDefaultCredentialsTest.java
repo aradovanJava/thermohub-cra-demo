@@ -27,14 +27,14 @@ class NoDefaultCredentialsTest {
 
     private static void start(String adminPassword) {
         String throwAwayDataKey = Base64.getEncoder().encodeToString(new byte[32]);
+        // Command-line args outrank application.properties and the environment; builder.properties() would not.
         new SpringApplicationBuilder(ThermoHubApplication.class)
-                .properties(
-                        "server.port=0",
-                        "spring.main.banner-mode=off",
-                        "thermohub.demo.enabled=false",
-                        "thermohub.admin.password=" + adminPassword,
-                        "thermohub.crypto.wifi.key=" + throwAwayDataKey)
-                .run()
+                .run(
+                        "--server.port=0",
+                        "--spring.main.banner-mode=off",
+                        "--thermohub.demo.enabled=false",
+                        "--thermohub.admin.password=" + adminPassword,
+                        "--thermohub.crypto.wifi.key=" + throwAwayDataKey)
                 .close();
     }
 }
