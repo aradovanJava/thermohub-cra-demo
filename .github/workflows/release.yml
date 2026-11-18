@@ -17,8 +17,8 @@ jobs:
       id-token: write        # keyless signing (Sigstore) for attestations
       attestations: write
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-java@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
         with:
           distribution: temurin
           java-version: "21"
@@ -28,18 +28,18 @@ jobs:
         run: mvn -B -pl thermohub-cra -am verify -Pcra-gate
 
       - name: Build provenance attestation (SLSA)
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.4.0
         with:
           subject-path: thermohub-cra/target/thermohub-cra-*.jar
 
       - name: SBOM attestation
-        uses: actions/attest-sbom@v2
+        uses: actions/attest-sbom@bd218ad0dbcb3e146bd073d1d9c6d78e08aa8a0b # v2.4.0
         with:
           subject-path: thermohub-cra/target/thermohub-cra-*.jar
           sbom-path: thermohub-cra/target/bom.json
 
       - name: Publish release with SBOM and conformance report
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
           files: |
             thermohub-cra/target/thermohub-cra-*.jar
