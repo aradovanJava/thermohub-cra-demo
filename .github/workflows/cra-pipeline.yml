@@ -100,7 +100,8 @@ jobs:
       # Fails on HIGH/CRITICAL findings that have a fix – "known exploitable" and remediable now.
       # If the CRA module turns red one morning, that is the system working: bump the BOM (Part II (2)).
       - name: Trivy – scan the SBOM
-        uses: aquasecurity/trivy-action@0.28.0
+        # Pinned to a full commit SHA: tags can be moved, a SHA cannot (A03 / Annex I Part II).
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: sbom
           scan-ref: evidence/bom.json
